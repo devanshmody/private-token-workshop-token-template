@@ -14,7 +14,7 @@ TODO:
 
 ====================================================================================================================  
 */
-program token.aleo {
+program devtoken.aleo {
     mapping balances: address => u64;  // On-chain mapping between user addresses and public token balances
 
     record Token {
@@ -22,7 +22,7 @@ program token.aleo {
         amount: u64,     // The token amount
     }
 
-    @noupgrade
+    @admin(address="aleo199eal94ys32pdeddz2ul64auru7kmupy4ge0a53xhuhdyvur5qgq28hdh9")
     async constructor() {}
 
 
@@ -52,7 +52,7 @@ program token.aleo {
         public amount: u64
     ) -> Future {
         let address_check : Future = workshop_ofac.aleo/address_check(recipient);
-
+        return mint_public_onchain(recipient, amount, address_check);
         // TODO: Fill in here
     }
 
@@ -62,7 +62,9 @@ program token.aleo {
         public address_check : Future
     ) {
         address_check.await();
-
+        let current_balance: u64 = Mapping::get_or_use(balances, recipient, 0u64);
+        let new_balance: u64 = current_balance + amount;
+        Mapping::set(balances, recipient, new_balance);
         // TODO: Fill in here
     }
 
@@ -91,12 +93,19 @@ program token.aleo {
         private recipient: address, 
         private amount: u64
     ) -> (Token,Future) {
+        let address_check : Future = workshop_ofac.aleo/address_check(recipient);
+        let new_token: Token = Token {
+            owner: recipient,
+            amount: amount,
+        };
+        return (new_token, mint_private_onchain(address_check));
         // TODO: Fill in here
 
     }
     async function mint_private_onchain(
         address_check : Future
     ){
+        address_check.await();
         // TODO: Fill in here
     }
 
@@ -128,6 +137,9 @@ program token.aleo {
         public recipient: address, 
         public amount: u64
     ) -> Future {
+        let sender: address = self.signer;
+        let address_check : Future = workshop_ofac.aleo/address_check(recipient);
+        return transfer_public_onchain(sender, recipient, amount, address_check);
         // TODO: Fill in here
     }
     async function transfer_public_onchain(
@@ -136,6 +148,13 @@ program token.aleo {
         public amount: u64,
         public address_check : Future
     ) {
+        address_check.await();
+        let sender_balance: u64 = Mapping::get_or_use(balances, sender, 0u64);
+        let new_sender_balance: u64 = sender_balance - amount;
+        Mapping::set(balances, sender, new_sender_balance);
+        let recipient_balance: u64 = Mapping::get_or_use(balances, recipient, 0u64);
+        let new_recipient_balance: u64 = recipient_balance + amount;
+        Mapping::set(balances, recipient, new_recipient_balance);
         // TODO: Fill in here
     }
 
@@ -169,18 +188,26 @@ program token.aleo {
         private recipient: address, 
         private amount: u64
     ) -> (Token, Token, Future) {
+        let address_check : Future = workshop_ofac.aleo/address_check(recipient);
+        let recipient_token: Token = Token {
+            owner: recipient,
+            amount: amount,
+        };
+        let sender_token: Token = Token {
+            owner: sender.owner,
+            amount: sender.amount - amount,
+        };
+        return (recipient_token, sender_token, transfer_private_onchain(address_check));
         // TODO: Fill in here
     }
 
     async function transfer_private_onchain(
         public address_check : Future
     ){
+        address_check.await();
         // TODO: Fill in here
     }
-
-
-
-
+}
 
     /*
     ====================================================================================================================
@@ -203,4 +230,35 @@ program token.aleo {
     
     ====================================================================================================================  
     */
+/*
+async transition transfer_private_to_public (
+        private sender: Token, 
+        public recipient: address, 
+        private amount: u64
+    ) -> (Token, Token) {
+        let (recipient_token, sender_token, future) = transfer_private(
+            sender,
+            recipient,
+            amount
+        );
+        future.await();
+    return (recipient_token, sender_token);
+    }
+    async function  approve_private(
+        private owner: address, 
+        private spender: address, 
+        private amount: u64
+    ) {
+        let allowance: u64 = Mapping::get_or_use(allowances, (owner, spender), 0u64);
+        Mapping::set(allowances, (owner, spender), allowance + amount);
+    }
+
+async function transfer_public_to_private (
+        public sender: address, 
+        private recipient: address, 
+        public amount: u64
+) {
+
 }
+*/
+
